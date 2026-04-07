@@ -3,157 +3,84 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>世界地図 タップ＆カウント</title>
+    <title>世界地図 ヒートマップ・カウント</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        body {
-            font-family: sans-serif;
-            margin: 0;
-            padding: 0;
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-        }
-        header {
-            background-color: #333;
-            color: white;
-            padding: 10px 20px;
-            text-align: center;
-        }
-        #main-container {
-            display: flex;
-            flex: 1;
-            overflow: hidden;
-        }
-        #map {
-            flex: 2;
-            height: 100%;
-        }
-        #stats-panel {
-            flex: 1;
-            background-color: #f4f4f4;
-            padding: 20px;
-            overflow-y: auto;
-            border-left: 2px solid #ccc;
-        }
-        /* ボタンエリアのスタイル */
-        .controls {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-        }
-        button {
-            flex: 1;
-            padding: 10px;
-            font-size: 14px;
-            cursor: pointer;
-            border: none;
-            border-radius: 5px;
-            color: white;
-            font-weight: bold;
-        }
-        #undo-btn {
-            background-color: #f39c12;
-        }
-        #undo-btn:disabled {
-            background-color: #f3ce95;
-            cursor: not-allowed;
-        }
-        #reset-btn {
-            background-color: #e74c3c;
-        }
-        h3 {
-            margin-top: 0;
-            border-bottom: 2px solid #ddd;
-            padding-bottom: 5px;
-        }
-        .stat-box {
-            margin-bottom: 20px;
-            background: white;
-            padding: 15px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        ul {
-            list-style-type: none;
-            padding: 0;
-            margin: 0;
-        }
-        li {
-            padding: 5px 0;
-            border-bottom: 1px solid #eee;
-            display: flex;
-            justify-content: space-between;
-        }
+        body { font-family: sans-serif; margin: 0; padding: 0; display: flex; flex-direction: column; height: 100vh; }
+        header { background-color: #333; color: white; padding: 10px 20px; text-align: center; }
+        #main-container { display: flex; flex: 1; overflow: hidden; }
+        #map { flex: 2; height: 100%; }
+        #stats-panel { flex: 1; background-color: #f4f4f4; padding: 20px; overflow-y: auto; border-left: 2px solid #ccc; }
+        .controls { display: flex; gap: 10px; margin-bottom: 20px; }
+        button { flex: 1; padding: 10px; font-size: 14px; cursor: pointer; border: none; border-radius: 5px; color: white; font-weight: bold; }
+        #undo-btn { background-color: #f39c12; }
+        #undo-btn:disabled { background-color: #f3ce95; cursor: not-allowed; }
+        #reset-btn { background-color: #e74c3c; }
+        h3 { margin-top: 0; border-bottom: 2px solid #ddd; padding-bottom: 5px; }
+        .stat-box { margin-bottom: 20px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        ul { list-style-type: none; padding: 0; margin: 0; }
+        li { padding: 5px 0; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; }
         @media (max-width: 768px) {
-            #main-container {
-                flex-direction: column;
-            }
-            #map {
-                flex: 1;
-                min-height: 50vh;
-            }
-            #stats-panel {
-                border-left: none;
-                border-top: 2px solid #ccc;
-            }
+            #main-container { flex-direction: column; }
+            #map { flex: 1; min-height: 50vh; }
+            #stats-panel { border-left: none; border-top: 2px solid #ccc; }
         }
     </style>
 </head>
 <body>
 
     <header>
-        <h2>世界地図 タップ＆カウント</h2>
+        <h2>世界地図 ヒートマップ・カウント</h2>
     </header>
 
     <div id="main-container">
         <div id="map"></div>
-
         <div id="stats-panel">
             <div class="controls">
                 <button id="undo-btn" disabled>↩ 一つ戻る</button>
                 <button id="reset-btn">✖ データリセット</button>
             </div>
-
             <div class="stat-box">
                 <h3>全体クリック数</h3>
                 <div id="total-count" style="font-size: 24px; font-weight: bold; text-align: center;">0</div>
             </div>
-
             <div class="stat-box">
                 <h3>国別カウント</h3>
-                <ul id="country-list">
-                    <li>データがありません</li>
-                </ul>
+                <ul id="country-list"><li>データがありません</li></ul>
             </div>
-
             <div class="stat-box">
                 <h3>州／県別カウント</h3>
-                <ul id="region-list">
-                    <li>データがありません</li>
-                </ul>
+                <ul id="region-list"><li>データがありません</li></ul>
             </div>
         </div>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://leaflet.github.io/Leaflet.heat/dist/leaflet-heat.js"></script>
+
     <script>
         const map = L.map('map').setView([35.68, 139.76], 2);
 
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            attribution: '&copy; OpenStreetMap contributors'
         }).addTo(map);
 
-        // 1. データの読み込み (LocalStorageから取得、なければ初期値)
+        // ヒートマップレイヤーの初期化
+        let heatLayer = L.heatLayer([], {
+            radius: 25,
+            blur: 15,
+            maxZoom: 10,
+            gradient: {0.4: 'blue', 0.65: 'lime', 1: 'red'}
+        }).addTo(map);
+
+        // データ読み込み
         let totalClicks = parseInt(localStorage.getItem('totalClicks')) || 0;
         let countryCounts = JSON.parse(localStorage.getItem('countryCounts')) || {};
         let regionCounts = JSON.parse(localStorage.getItem('regionCounts')) || {};
-        let clickHistory = JSON.parse(localStorage.getItem('clickHistory')) || []; // 戻る機能のための履歴
+        let clickHistory = JSON.parse(localStorage.getItem('clickHistory')) || [];
 
-        // 初期表示の更新
         updateUI();
 
-        // 2. データを保存する関数
         function saveData() {
             localStorage.setItem('totalClicks', totalClicks);
             localStorage.setItem('countryCounts', JSON.stringify(countryCounts));
@@ -161,122 +88,81 @@
             localStorage.setItem('clickHistory', JSON.stringify(clickHistory));
         }
 
-        // 3. 地図クリック処理
         map.on('click', async function(e) {
-            const lat = e.latlng.lat;
-            const lng = e.latlng.lng;
-
-            const popup = L.popup()
-                .setLatLng(e.latlng)
-                .setContent("地名を検索中...")
-                .openOn(map);
+            const { lat, lng } = e.latlng;
+            const popup = L.popup().setLatLng(e.latlng).setContent("検索中...").openOn(map);
 
             try {
                 const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=jsonv2&accept-language=ja`;
                 const response = await fetch(url);
                 const data = await response.json();
 
-                if (data.error) {
+                if (data.error || !data.address) {
                     popup.setContent("陸地が見つかりません");
                     return;
                 }
 
-                if (data && data.address) {
-                    const country = data.address.country || '不明な国';
-                    const region = data.address.state || data.address.province || data.address.region || data.address.county || '不明な地域';
-                    const regionKey = `${country} - ${region}`;
+                const country = data.address.country || '不明な国';
+                const region = data.address.state || data.address.province || data.address.region || data.address.county || '不明な地域';
+                const regionKey = `${country} - ${region}`;
 
-                    popup.setContent(`<b>${country}</b><br>${region}`);
+                popup.setContent(`<b>${country}</b><br>${region}`);
 
-                    // カウントの更新
-                    totalClicks++;
-                    countryCounts[country] = (countryCounts[country] || 0) + 1;
-                    regionCounts[regionKey] = (regionCounts[regionKey] || 0) + 1;
+                // データの更新
+                totalClicks++;
+                countryCounts[country] = (countryCounts[country] || 0) + 1;
+                regionCounts[regionKey] = (regionCounts[regionKey] || 0) + 1;
+                
+                // 座標も履歴に保存
+                clickHistory.push({ country, regionKey, lat, lng });
 
-                    // 履歴に追加 (戻るボタン用)
-                    clickHistory.push({ country, regionKey });
-
-                    // 保存と画面更新
-                    saveData();
-                    updateUI();
-                }
+                saveData();
+                updateUI();
 
             } catch (error) {
                 console.error("APIエラー:", error);
-                popup.setContent("データの取得に失敗しました。");
+                popup.setContent("エラーが発生しました。");
             }
         });
 
-        // 4. 「一つ戻る」ボタンの処理
         document.getElementById('undo-btn').addEventListener('click', () => {
             if (clickHistory.length === 0) return;
-
-            // 最後の履歴を取り出す
-            const lastClick = clickHistory.pop();
-
-            // カウントを減らす
+            const last = clickHistory.pop();
             totalClicks--;
-            
-            countryCounts[lastClick.country]--;
-            if (countryCounts[lastClick.country] === 0) {
-                delete countryCounts[lastClick.country]; // 0になったらリストから消す
-            }
-
-            regionCounts[lastClick.regionKey]--;
-            if (regionCounts[lastClick.regionKey] === 0) {
-                delete regionCounts[lastClick.regionKey]; // 0になったらリストから消す
-            }
-
-            // 保存と画面更新
+            if (--countryCounts[last.country] === 0) delete countryCounts[last.country];
+            if (--regionCounts[last.regionKey] === 0) delete regionCounts[last.regionKey];
             saveData();
             updateUI();
         });
 
-        // 5. 「データリセット」ボタンの処理
         document.getElementById('reset-btn').addEventListener('click', () => {
-            if(confirm("保存されたすべてのデータを消去しますか？")) {
-                totalClicks = 0;
-                countryCounts = {};
-                regionCounts = {};
-                clickHistory = [];
-                localStorage.clear(); // LocalStorageのデータを全消去
+            if(confirm("全データを消去しますか？")) {
+                totalClicks = 0; countryCounts = {}; regionCounts = {}; clickHistory = [];
+                localStorage.clear();
                 updateUI();
             }
         });
 
-        // 6. 画面（UI）の更新関数
         function updateUI() {
             document.getElementById('total-count').innerText = totalClicks;
             updateList('country-list', countryCounts);
             updateList('region-list', regionCounts);
-
-            // 履歴がなければ「戻る」ボタンを無効化する
             document.getElementById('undo-btn').disabled = clickHistory.length === 0;
+
+            // ヒートマップの更新
+            const heatPoints = clickHistory.map(h => [h.lat, h.lng, 1]); // [緯度, 経度, 強度]
+            heatLayer.setLatLngs(heatPoints);
         }
 
-        // 辞書オブジェクトからHTMLリストを生成・更新するヘルパー関数
-        function updateList(elementId, dataObj) {
-            const listElement = document.getElementById(elementId);
-            listElement.innerHTML = ''; 
-
-            const sortedKeys = Object.keys(dataObj).sort((a, b) => dataObj[b] - dataObj[a]);
-
-            if (sortedKeys.length === 0) {
-                listElement.innerHTML = '<li>データがありません</li>';
-                return;
-            }
-
-            sortedKeys.forEach(key => {
+        function updateList(id, data) {
+            const el = document.getElementById(id);
+            el.innerHTML = '';
+            const sorted = Object.keys(data).sort((a, b) => data[b] - data[a]);
+            if (!sorted.length) { el.innerHTML = '<li>データなし</li>'; return; }
+            sorted.forEach(k => {
                 const li = document.createElement('li');
-                const nameSpan = document.createElement('span');
-                nameSpan.innerText = key;
-                const countSpan = document.createElement('span');
-                countSpan.innerText = `${dataObj[key]} 人`;
-                countSpan.style.fontWeight = 'bold';
-
-                li.appendChild(nameSpan);
-                li.appendChild(countSpan);
-                listElement.appendChild(li);
+                li.innerHTML = `<span>${k}</span><b>${data[k]} 回</b>`;
+                el.appendChild(li);
             });
         }
     </script>
