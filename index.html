@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>世界地図 ヒートマップ・カウント</title>
+    <title>世界地図 国旗ピン・カウント</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { font-family: sans-serif; margin: 0; padding: 0; display: flex; flex-direction: column; height: 100vh; }
@@ -11,15 +11,20 @@
         #main-container { display: flex; flex: 1; overflow: hidden; }
         #map { flex: 2; height: 100%; }
         #stats-panel { flex: 1; background-color: #f4f4f4; padding: 20px; overflow-y: auto; border-left: 2px solid #ccc; }
-        .controls { display: flex; gap: 10px; margin-bottom: 20px; }
-        button { flex: 1; padding: 10px; font-size: 14px; cursor: pointer; border: none; border-radius: 5px; color: white; font-weight: bold; }
+        
+        /* ボタンエリア：タップしやすく大きめに調整 */
+        .controls { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+        button { flex: 1; min-width: 130px; padding: 15px; font-size: 16px; cursor: pointer; border: none; border-radius: 8px; color: white; font-weight: bold; }
         #undo-btn { background-color: #f39c12; }
         #undo-btn:disabled { background-color: #f3ce95; cursor: not-allowed; }
         #reset-btn { background-color: #e74c3c; }
-        h3 { margin-top: 0; border-bottom: 2px solid #ddd; padding-bottom: 5px; }
+        #csv-btn { background-color: #27ae60; }
+        
         .stat-box { margin-bottom: 20px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         ul { list-style-type: none; padding: 0; margin: 0; }
-        li { padding: 5px 0; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; }
+        li { padding: 10px 0; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; font-size: 16px; }
+        .flag-icon-mini { width: 28px; height: auto; margin-right: 10px; vertical-align: middle; border: 1px solid #ddd; }
+        
         @media (max-width: 768px) {
             #main-container { flex-direction: column; }
             #map { flex: 1; min-height: 50vh; }
@@ -30,7 +35,7 @@
 <body>
 
     <header>
-        <h2>世界地図 ヒートマップ・カウント</h2>
+        <h2>世界地図 国旗ピン・カウント</h2>
     </header>
 
     <div id="main-container">
@@ -38,90 +43,74 @@
         <div id="stats-panel">
             <div class="controls">
                 <button id="undo-btn" disabled>↩ 一つ戻る</button>
-                <button id="reset-btn">✖ データリセット</button>
+                <button id="reset-btn">✖ リセット</button>
+                <button id="csv-btn">📥 CSV保存</button>
             </div>
             <div class="stat-box">
                 <h3>全体クリック数</h3>
-                <div id="total-count" style="font-size: 24px; font-weight: bold; text-align: center;">0</div>
+                <div id="total-count" style="font-size: 28px; font-weight: bold; text-align: center;">0</div>
             </div>
             <div class="stat-box">
-                <h3>国別カウント</h3>
+                <h3>訪問済みの国</h3>
                 <ul id="country-list"><li>データがありません</li></ul>
-            </div>
-            <div class="stat-box">
-                <h3>州／県別カウント</h3>
-                <ul id="region-list"><li>データがありません</li></ul>
             </div>
         </div>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://leaflet.github.io/Leaflet.heat/dist/leaflet-heat.js"></script>
-
     <script>
         const map = L.map('map').setView([35.68, 139.76], 2);
-
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; OpenStreetMap contributors'
         }).addTo(map);
 
-        // ヒートマップレイヤーの初期化
-        let heatLayer = L.heatLayer([], {
-            radius: 25,
-            blur: 15,
-            maxZoom: 10,
-            gradient: {0.4: 'blue', 0.65: 'lime', 1: 'red'}
-        }).addTo(map);
+        // マーカーを管理するグループ
+        let markerGroup = L.layerGroup().addTo(map);
 
-        // データ読み込み
+        // データの読み込み
         let totalClicks = parseInt(localStorage.getItem('totalClicks')) || 0;
         let countryCounts = JSON.parse(localStorage.getItem('countryCounts')) || {};
-        let regionCounts = JSON.parse(localStorage.getItem('regionCounts')) || {};
         let clickHistory = JSON.parse(localStorage.getItem('clickHistory')) || [];
 
+        // 初回起動時に保存されているピンを表示
         updateUI();
 
         function saveData() {
             localStorage.setItem('totalClicks', totalClicks);
             localStorage.setItem('countryCounts', JSON.stringify(countryCounts));
-            localStorage.setItem('regionCounts', JSON.stringify(regionCounts));
             localStorage.setItem('clickHistory', JSON.stringify(clickHistory));
         }
 
         map.on('click', async function(e) {
             const { lat, lng } = e.latlng;
-            const popup = L.popup().setLatLng(e.latlng).setContent("検索中...").openOn(map);
+            const tempPopup = L.popup().setLatLng(e.latlng).setContent("旗を準備中...").openOn(map);
 
             try {
+                // Nominatim APIで国名コード(country_code)を取得
                 const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=jsonv2&accept-language=ja`;
                 const response = await fetch(url);
                 const data = await response.json();
 
-                if (data.error || !data.address) {
-                    popup.setContent("陸地が見つかりません");
+                if (data.error || !data.address || !data.address.country_code) {
+                    tempPopup.setContent("そこには旗を立てられません");
                     return;
                 }
 
-                const country = data.address.country || '不明な国';
-                const region = data.address.state || data.address.province || data.address.region || data.address.county || '不明な地域';
-                const regionKey = `${country} - ${region}`;
-
-                popup.setContent(`<b>${country}</b><br>${region}`);
+                const countryName = data.address.country || '不明な国';
+                const countryCode = data.address.country_code.toLowerCase();
 
                 // データの更新
                 totalClicks++;
-                countryCounts[country] = (countryCounts[country] || 0) + 1;
-                regionCounts[regionKey] = (regionCounts[regionKey] || 0) + 1;
-                
-                // 座標も履歴に保存
-                clickHistory.push({ country, regionKey, lat, lng });
+                countryCounts[countryName] = (countryCounts[countryName] || 0) + 1;
+                clickHistory.push({ country: countryName, code: countryCode, lat, lng });
 
+                map.closePopup();
                 saveData();
                 updateUI();
 
             } catch (error) {
-                console.error("APIエラー:", error);
-                popup.setContent("エラーが発生しました。");
+                console.error("エラー:", error);
+                tempPopup.setContent("エラーが発生しました。");
             }
         });
 
@@ -130,28 +119,61 @@
             const last = clickHistory.pop();
             totalClicks--;
             if (--countryCounts[last.country] === 0) delete countryCounts[last.country];
-            if (--regionCounts[last.regionKey] === 0) delete regionCounts[last.regionKey];
             saveData();
             updateUI();
         });
 
         document.getElementById('reset-btn').addEventListener('click', () => {
-            if(confirm("全データを消去しますか？")) {
-                totalClicks = 0; countryCounts = {}; regionCounts = {}; clickHistory = [];
+            if(confirm("すべての旗とデータを消去しますか？")) {
+                totalClicks = 0; countryCounts = {}; clickHistory = [];
                 localStorage.clear();
                 updateUI();
             }
         });
 
+        // CSV出力機能
+        document.getElementById('csv-btn').addEventListener('click', () => {
+            if (clickHistory.length === 0) {
+                alert("保存するデータがありません。");
+                return;
+            }
+            // Excelなどで文字化けしないようにBOM付きUTF-8にする
+            let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
+            csvContent += "国名,国コード,緯度,経度\n";
+            
+            clickHistory.forEach(item => {
+                csvContent += `"${item.country}",${item.code},${item.lat},${item.lng}\n`;
+            });
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "map_flags_history.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
+
         function updateUI() {
             document.getElementById('total-count').innerText = totalClicks;
             updateList('country-list', countryCounts);
-            updateList('region-list', regionCounts);
             document.getElementById('undo-btn').disabled = clickHistory.length === 0;
 
-            // ヒートマップの更新
-            const heatPoints = clickHistory.map(h => [h.lat, h.lng, 1]); // [緯度, 経度, 強度]
-            heatLayer.setLatLngs(heatPoints);
+            // マーカーの再描画
+            markerGroup.clearLayers();
+            clickHistory.forEach(item => {
+                const flagIcon = L.icon({
+                    iconUrl: `https://flagcdn.com/w40/${item.code}.png`,
+                    iconSize: [30, 20],
+                    iconAnchor: [15, 10],
+                    popupAnchor: [0, -10],
+                    className: 'flag-marker'
+                });
+
+                L.marker([item.lat, item.lng], { icon: flagIcon })
+                 .addTo(markerGroup)
+                 .bindPopup(`<b>${item.country}</b>`);
+            });
         }
 
         function updateList(id, data) {
@@ -159,9 +181,18 @@
             el.innerHTML = '';
             const sorted = Object.keys(data).sort((a, b) => data[b] - data[a]);
             if (!sorted.length) { el.innerHTML = '<li>データなし</li>'; return; }
+            
             sorted.forEach(k => {
+                const historyItem = clickHistory.find(h => h.country === k);
+                const flagUrl = historyItem ? `https://flagcdn.com/w40/${historyItem.code}.png` : '';
+                
                 const li = document.createElement('li');
-                li.innerHTML = `<span>${k}</span><b>${data[k]} 回</b>`;
+                li.innerHTML = `
+                    <span>
+                        <img src="${flagUrl}" class="flag-icon-mini">
+                        ${k}
+                    </span>
+                    <b>${data[k]} 回</b>`;
                 el.appendChild(li);
             });
         }
