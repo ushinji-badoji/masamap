@@ -1,58 +1,232 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>世界地図 国旗ピン・カウント</title>
+    <title>World Map Flag Count</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        body { font-family: sans-serif; margin: 0; padding: 0; display: flex; flex-direction: column; height: 100vh; }
-        header { background-color: #333; color: white; padding: 10px 20px; text-align: center; }
-        #main-container { display: flex; flex: 1; overflow: hidden; }
-        #map { flex: 2; height: 100%; }
-        #stats-panel { flex: 1; background-color: #f4f4f4; padding: 20px; overflow-y: auto; border-left: 2px solid #ccc; }
-        
-        /* ボタンエリア：タップしやすく大きめに調整 */
-        .controls { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
-        button { flex: 1; min-width: 130px; padding: 15px; font-size: 16px; cursor: pointer; border: none; border-radius: 8px; color: white; font-weight: bold; }
-        #undo-btn { background-color: #f39c12; }
-        #undo-btn:disabled { background-color: #f3ce95; cursor: not-allowed; }
-        #reset-btn { background-color: #e74c3c; }
-        #csv-btn { background-color: #27ae60; }
-        
-        .stat-box { margin-bottom: 20px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        ul { list-style-type: none; padding: 0; margin: 0; }
-        li { padding: 10px 0; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; font-size: 16px; }
-        .flag-icon-mini { width: 28px; height: auto; margin-right: 10px; vertical-align: middle; border: 1px solid #ddd; }
-        
+        body {
+            font-family: sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        header {
+            background-color: #333;
+            color: white;
+            padding: 10px 20px;
+            text-align: center;
+        }
+
+        #main-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        #map {
+            flex: 2;
+            height: 100%;
+        }
+
+        #stats-panel {
+            flex: 1;
+            background-color: #f4f4f4;
+            padding: 20px;
+            overflow-y: auto;
+            border-left: 2px solid #ccc;
+        }
+
+        /* Button area: adjusted larger for easier tapping */
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            flex: 1;
+            min-width: 130px;
+            padding: 15px;
+            font-size: 16px;
+            cursor: pointer;
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-weight: bold;
+        }
+
+        #undo-btn {
+            background-color: #f39c12;
+        }
+
+        #undo-btn:disabled {
+            background-color: #f3ce95;
+            cursor: not-allowed;
+        }
+
+        #reset-btn {
+            background-color: #e74c3c;
+        }
+
+        #csv-btn {
+            background-color: #27ae60;
+        }
+
+        #load-csv-btn {
+            background-color: #3498db;
+        }
+
+        .stat-box {
+            margin-bottom: 20px;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        ul {
+            list-style-type: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        li {
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 16px;
+        }
+
+        .flag-icon-mini {
+            width: 28px;
+            height: auto;
+            margin-right: 10px;
+            vertical-align: middle;
+            border: 1px solid #ddd;
+        }
+
+        /* 3D Pin Styles */
+        .custom-pin {
+            background: transparent;
+            border: none;
+        }
+
+        .pin-wrapper {
+            position: relative;
+            width: 40px;
+            height: 50px;
+        }
+
+        .pin-shadow {
+            position: absolute;
+            left: 5px;
+            bottom: -2px;
+            width: 20px;
+            height: 6px;
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 50%;
+            filter: blur(2px);
+            transform: skewX(-45deg);
+            transform-origin: left bottom;
+        }
+
+        .pin-stick {
+            position: absolute;
+            left: 6px;
+            bottom: 0px;
+            width: 3px;
+            height: 40px;
+            background: linear-gradient(to right, #ccc, #555, #ccc);
+            border-radius: 1px;
+            box-shadow: 1px 1px 2px rgba(0,0,0,0.6);
+        }
+
+        .pin-head {
+            position: absolute;
+            left: 4px;
+            top: 7px;
+            width: 7px;
+            height: 7px;
+            background: radial-gradient(circle at 30% 30%, #f1c40f, #d35400, #900);
+            border-radius: 50%;
+            box-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+            z-index: 2;
+        }
+
+        .pin-flag {
+            position: absolute;
+            left: 8px;
+            top: 10px;
+            width: 26px;
+            height: 18px;
+            background-size: cover;
+            background-position: center;
+            box-shadow: 2px 2px 4px rgba(0,0,0,0.4);
+            transform-origin: left center;
+            transform: perspective(150px) rotateY(-20deg) skewY(-2deg);
+            border-radius: 1px 3px 3px 1px;
+            border-left: 2px solid rgba(255,255,255,0.7);
+            animation: waveFlag 3s ease-in-out infinite alternate;
+            z-index: 1;
+        }
+
+        @keyframes waveFlag {
+            0% { transform: perspective(150px) rotateY(-20deg) skewY(-2deg); }
+            100% { transform: perspective(150px) rotateY(-5deg) skewY(1deg); }
+        }
+
         @media (max-width: 768px) {
-            #main-container { flex-direction: column; }
-            #map { flex: 1; min-height: 50vh; }
-            #stats-panel { border-left: none; border-top: 2px solid #ccc; }
+            #main-container {
+                flex-direction: column;
+            }
+
+            #map {
+                flex: 1;
+                min-height: 50vh;
+            }
+
+            #stats-panel {
+                border-left: none;
+                border-top: 2px solid #ccc;
+            }
         }
     </style>
 </head>
+
 <body>
 
     <header>
-        <h2>世界地図 国旗ピン・カウント</h2>
+        <h2>Attendance Map</h2>
     </header>
 
     <div id="main-container">
         <div id="map"></div>
         <div id="stats-panel">
             <div class="controls">
-                <button id="undo-btn" disabled>↩ 一つ戻る</button>
-                <button id="reset-btn">✖ リセット</button>
-                <button id="csv-btn">📥 CSV保存</button>
+                <button id="undo-btn" disabled>↩ Undo</button>
+                <button id="reset-btn">✖ Reset</button>
+                <button id="csv-btn">📥 Save CSV</button>
+                <button id="load-csv-btn">📤 Load CSV</button>
+                <input type="file" id="csv-upload" accept=".csv" style="display: none;">
             </div>
             <div class="stat-box">
-                <h3>全体クリック数</h3>
+                <h3>Total Clicks</h3>
                 <div id="total-count" style="font-size: 28px; font-weight: bold; text-align: center;">0</div>
             </div>
             <div class="stat-box">
-                <h3>訪問済みの国</h3>
-                <ul id="country-list"><li>データがありません</li></ul>
+                <h3>Workshop Participants</h3>
+                <ul id="country-list">
+                    <li>No data</li>
+                </ul>
             </div>
         </div>
     </div>
@@ -64,15 +238,15 @@
             attribution: '&copy; OpenStreetMap contributors'
         }).addTo(map);
 
-        // マーカーを管理するグループ
+        // Group to manage markers
         let markerGroup = L.layerGroup().addTo(map);
 
-        // データの読み込み
+        // Load data
         let totalClicks = parseInt(localStorage.getItem('totalClicks')) || 0;
         let countryCounts = JSON.parse(localStorage.getItem('countryCounts')) || {};
         let clickHistory = JSON.parse(localStorage.getItem('clickHistory')) || [];
 
-        // 初回起動時に保存されているピンを表示
+        // Display saved pins on initial load
         updateUI();
 
         function saveData() {
@@ -81,36 +255,45 @@
             localStorage.setItem('clickHistory', JSON.stringify(clickHistory));
         }
 
-        map.on('click', async function(e) {
+        map.on('click', async function (e) {
             const { lat, lng } = e.latlng;
-            const tempPopup = L.popup().setLatLng(e.latlng).setContent("旗を準備中...").openOn(map);
+            const tempPopup = L.popup().setLatLng(e.latlng).setContent("Preparing flag...").openOn(map);
 
             try {
-                // Nominatim APIで国名コード(country_code)を取得
-                const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=jsonv2&accept-language=ja`;
+                // Get country code from Nominatim API
+                const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=jsonv2&accept-language=en`;
                 const response = await fetch(url);
                 const data = await response.json();
 
                 if (data.error || !data.address || !data.address.country_code) {
-                    tempPopup.setContent("そこには旗を立てられません");
+                    tempPopup.setContent("Cannot place flag here");
                     return;
                 }
 
-                const countryName = data.address.country || '不明な国';
+                const countryName = data.address.country || 'Unknown country';
+                const stateName = data.address.state || data.address.province || data.address.region || '';
                 const countryCode = data.address.country_code.toLowerCase();
 
-                // データの更新
+                const today = new Date();
+                const yyyy = today.getFullYear();
+                const mm = String(today.getMonth() + 1).padStart(2, '0');
+                const dd = String(today.getDate()).padStart(2, '0');
+                const dateStr = `${yyyy}/${mm}/${dd}`;
+
+                const locName = stateName ? `${countryName} (${stateName})` : countryName;
+
+                // Update data
                 totalClicks++;
-                countryCounts[countryName] = (countryCounts[countryName] || 0) + 1;
-                clickHistory.push({ country: countryName, code: countryCode, lat, lng });
+                countryCounts[locName] = (countryCounts[locName] || 0) + 1;
+                clickHistory.push({ country: countryName, state: stateName, code: countryCode, lat, lng, date: dateStr });
 
                 map.closePopup();
                 saveData();
                 updateUI();
 
             } catch (error) {
-                console.error("エラー:", error);
-                tempPopup.setContent("エラーが発生しました。");
+                console.error("Error:", error);
+                tempPopup.setContent("An error occurred.");
             }
         });
 
@@ -118,31 +301,38 @@
             if (clickHistory.length === 0) return;
             const last = clickHistory.pop();
             totalClicks--;
-            if (--countryCounts[last.country] === 0) delete countryCounts[last.country];
+            const locName = last.state ? `${last.country} (${last.state})` : last.country;
+            if (countryCounts[locName]) {
+                if (--countryCounts[locName] === 0) delete countryCounts[locName];
+            } else if (countryCounts[last.country]) {
+                if (--countryCounts[last.country] === 0) delete countryCounts[last.country];
+            }
             saveData();
             updateUI();
         });
 
         document.getElementById('reset-btn').addEventListener('click', () => {
-            if(confirm("すべての旗とデータを消去しますか？")) {
+            if (confirm("Delete all flags and data?")) {
                 totalClicks = 0; countryCounts = {}; clickHistory = [];
                 localStorage.clear();
                 updateUI();
             }
         });
 
-        // CSV出力機能
+        // CSV export feature
         document.getElementById('csv-btn').addEventListener('click', () => {
             if (clickHistory.length === 0) {
-                alert("保存するデータがありません。");
+                alert("No data to save.");
                 return;
             }
-            // Excelなどで文字化けしないようにBOM付きUTF-8にする
+            // Add BOM for UTF-8 to prevent garbled text in Excel etc.
             let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
-            csvContent += "国名,国コード,緯度,経度\n";
-            
+            csvContent += "Country,State,Country Code,Latitude,Longitude,Date\n";
+
             clickHistory.forEach(item => {
-                csvContent += `"${item.country}",${item.code},${item.lat},${item.lng}\n`;
+                const date = item.date || "";
+                const state = item.state || "";
+                csvContent += `"${item.country}","${state}",${item.code},${item.lat},${item.lng},${date}\n`;
             });
 
             const encodedUri = encodeURI(csvContent);
@@ -154,25 +344,109 @@
             document.body.removeChild(link);
         });
 
+        // CSV import feature
+        document.getElementById('load-csv-btn').addEventListener('click', () => {
+            document.getElementById('csv-upload').click();
+        });
+
+        document.getElementById('csv-upload').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const text = event.target.result;
+                const lines = text.split('\n');
+                
+                let mergedCount = 0;
+                
+                for (let i = 1; i < lines.length; i++) {
+                    const line = lines[i].trim();
+                    if (!line) continue;
+                    
+                    const parts = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
+                    let country, state, code, lat, lng, date;
+
+                    if (parts.length >= 5 && Number.isNaN(parseFloat(parts[2]))) {
+                        // New format: Country,State,Country Code,Lat,Lng,Date
+                        country = parts[0].replace(/^"|"$/g, '').trim();
+                        state = parts[1].replace(/^"|"$/g, '').trim();
+                        code = parts[2].trim();
+                        lat = parseFloat(parts[3]);
+                        lng = parseFloat(parts[4]);
+                        date = parts[5] ? parts[5].replace(/^"|"$/g, '').trim() : "";
+                    } else if (parts.length >= 4) {
+                        // Old format: Country,Country Code,Lat,Lng,Date
+                        country = parts[0].replace(/^"|"$/g, '').trim();
+                        state = "";
+                        code = parts[1].trim();
+                        lat = parseFloat(parts[2]);
+                        lng = parseFloat(parts[3]);
+                        date = parts[4] ? parts[4].replace(/^"|"$/g, '').trim() : "";
+                    } else {
+                        continue;
+                    }
+                    
+                    if (country && code && !isNaN(lat) && !isNaN(lng)) {
+                        // Check for duplicates
+                        const isDuplicate = clickHistory.some(item => 
+                            item.lat === lat && item.lng === lng && item.code === code && (item.date || "") === date
+                        );
+                        
+                        if (!isDuplicate) {
+                            clickHistory.push({ country, state, code, lat, lng, date });
+                            totalClicks++;
+                            const locName = state ? `${country} (${state})` : country;
+                            countryCounts[locName] = (countryCounts[locName] || 0) + 1;
+                            mergedCount++;
+                        }
+                    }
+                }
+                
+                if (mergedCount > 0) {
+                    saveData();
+                    updateUI();
+                    alert(`${mergedCount} records merged successfully.`);
+                } else {
+                    alert("No new records to merge or invalid CSV file.");
+                }
+                
+                e.target.value = ''; // Reset input
+            };
+            reader.readAsText(file);
+        });
+
         function updateUI() {
             document.getElementById('total-count').innerText = totalClicks;
             updateList('country-list', countryCounts);
             document.getElementById('undo-btn').disabled = clickHistory.length === 0;
 
-            // マーカーの再描画
+            // Redraw markers
             markerGroup.clearLayers();
             clickHistory.forEach(item => {
-                const flagIcon = L.icon({
-                    iconUrl: `https://flagcdn.com/w40/${item.code}.png`,
-                    iconSize: [30, 20],
-                    iconAnchor: [15, 10],
-                    popupAnchor: [0, -10],
-                    className: 'flag-marker'
+                const flagUrl = `https://flagcdn.com/w40/${item.code}.png`;
+                const randomDelay = (Math.random() * 3).toFixed(2);
+                const flagHtml = `
+                    <div class="pin-wrapper">
+                        <div class="pin-shadow"></div>
+                        <div class="pin-stick"></div>
+                        <div class="pin-flag" style="background-image: url('${flagUrl}'); animation-delay: -${randomDelay}s;"></div>
+                        <div class="pin-head"></div>
+                    </div>
+                `;
+
+                const flagIcon = L.divIcon({
+                    html: flagHtml,
+                    className: 'custom-pin',
+                    iconSize: [40, 50],
+                    iconAnchor: [7, 50],
+                    popupAnchor: [5, -45]
                 });
 
+                const locName = item.state ? `${item.country} (${item.state})` : item.country;
                 L.marker([item.lat, item.lng], { icon: flagIcon })
-                 .addTo(markerGroup)
-                 .bindPopup(`<b>${item.country}</b>`);
+                    .addTo(markerGroup)
+                    .bindPopup(`<b>${locName}</b>`);
             });
         }
 
@@ -180,22 +454,26 @@
             const el = document.getElementById(id);
             el.innerHTML = '';
             const sorted = Object.keys(data).sort((a, b) => data[b] - data[a]);
-            if (!sorted.length) { el.innerHTML = '<li>データなし</li>'; return; }
-            
+            if (!sorted.length) { el.innerHTML = '<li>No data</li>'; return; }
+
             sorted.forEach(k => {
-                const historyItem = clickHistory.find(h => h.country === k);
+                const historyItem = clickHistory.find(h => {
+                    const locName = h.state ? `${h.country} (${h.state})` : h.country;
+                    return locName === k || h.country === k;
+                });
                 const flagUrl = historyItem ? `https://flagcdn.com/w40/${historyItem.code}.png` : '';
-                
+
                 const li = document.createElement('li');
                 li.innerHTML = `
                     <span>
                         <img src="${flagUrl}" class="flag-icon-mini">
                         ${k}
                     </span>
-                    <b>${data[k]} 回</b>`;
+                    <b>${data[k]} times</b>`;
                 el.appendChild(li);
             });
         }
     </script>
 </body>
+
 </html>
