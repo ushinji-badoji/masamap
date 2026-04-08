@@ -16,13 +16,6 @@
             height: 100vh;
         }
 
-        header {
-            background-color: #333;
-            color: white;
-            padding: 10px 20px;
-            text-align: center;
-        }
-
         #main-container {
             display: flex;
             flex: 1;
@@ -147,7 +140,7 @@
             height: 40px;
             background: linear-gradient(to right, #ccc, #555, #ccc);
             border-radius: 1px;
-            box-shadow: 1px 1px 2px rgba(0,0,0,0.6);
+            box-shadow: 1px 1px 2px rgba(0, 0, 0, 0.6);
         }
 
         .pin-head {
@@ -158,7 +151,7 @@
             height: 7px;
             background: radial-gradient(circle at 30% 30%, #f1c40f, #d35400, #900);
             border-radius: 50%;
-            box-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+            box-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
             z-index: 2;
         }
 
@@ -170,18 +163,23 @@
             height: 18px;
             background-size: cover;
             background-position: center;
-            box-shadow: 2px 2px 4px rgba(0,0,0,0.4);
+            box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.4);
             transform-origin: left center;
             transform: perspective(150px) rotateY(-20deg) skewY(-2deg);
             border-radius: 1px 3px 3px 1px;
-            border-left: 2px solid rgba(255,255,255,0.7);
+            border-left: 2px solid rgba(255, 255, 255, 0.7);
             animation: waveFlag 3s ease-in-out infinite alternate;
             z-index: 1;
         }
 
         @keyframes waveFlag {
-            0% { transform: perspective(150px) rotateY(-20deg) skewY(-2deg); }
-            100% { transform: perspective(150px) rotateY(-5deg) skewY(1deg); }
+            0% {
+                transform: perspective(150px) rotateY(-20deg) skewY(-2deg);
+            }
+
+            100% {
+                transform: perspective(150px) rotateY(-5deg) skewY(1deg);
+            }
         }
 
         @media (max-width: 768px) {
@@ -203,10 +201,6 @@
 </head>
 
 <body>
-
-    <header>
-        <h2>Attendance Map</h2>
-    </header>
 
     <div id="main-container">
         <div id="map"></div>
@@ -232,35 +226,88 @@
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script>
-        const map = L.map('map').setView([35.68, 139.76], 2);
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getDatabase, ref, onValue, push, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+        // ==========================================
+        // 【Firebase設定部】
+        // Firebaseでプロジェクトを作成後、ここに設定値を貼り付けてください
+        // ==========================================
+        // Your web app's Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyB7V04qPXpukALMUxnI97P8m-vL_ZhoyVA",
+            authDomain: "masamap-workshop.firebaseapp.com",
+            databaseURL: "https://masamap-workshop-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "masamap-workshop",
+            storageBucket: "masamap-workshop.firebasestorage.app",
+            messagingSenderId: "116054383637",
+            appId: "1:116054383637:web:582885e606c9acdd85c21c"
+        };
+        const isFirebaseConfigured = true;
+        const mapBounds = [[-90, -180], [90, 180]];
+        const map = L.map('map', {
+            minZoom: 2,
+            maxBounds: mapBounds,
+            maxBoundsViscosity: 1.0
+        }).setView([35.68, 139.76], 2);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; OpenStreetMap contributors'
+            attribution: '&copy; OpenStreetMap contributors',
+            noWrap: true,
+            bounds: mapBounds
         }).addTo(map);
 
-        // Group to manage markers
         let markerGroup = L.layerGroup().addTo(map);
 
-        // Load data
-        let totalClicks = parseInt(localStorage.getItem('totalClicks')) || 0;
-        let countryCounts = JSON.parse(localStorage.getItem('countryCounts')) || {};
-        let clickHistory = JSON.parse(localStorage.getItem('clickHistory')) || [];
+        let totalClicks = 0;
+        let countryCounts = {};
+        let clickHistory = [];
 
-        // Display saved pins on initial load
-        updateUI();
+        let db;
+        let dbRefClicks;
 
-        function saveData() {
-            localStorage.setItem('totalClicks', totalClicks);
-            localStorage.setItem('countryCounts', JSON.stringify(countryCounts));
-            localStorage.setItem('clickHistory', JSON.stringify(clickHistory));
+        if (isFirebaseConfigured) {
+            const app = initializeApp(firebaseConfig);
+            db = getDatabase(app);
+            dbRefClicks = ref(db, 'clicks');
+
+            // データベースの変更をリアルタイムで監視（マルチブラウザ同期）
+            onValue(dbRefClicks, (snapshot) => {
+                totalClicks = 0;
+                countryCounts = {};
+                clickHistory = [];
+                const data = snapshot.val();
+
+                if (data) {
+                    for (const key in data) {
+                        const item = data[key];
+                        item.firebaseKey = key;
+                        clickHistory.push(item);
+
+                        // 集計
+                        totalClicks++;
+                        const locName = item.state ? `${item.country} (${item.state})` : item.country;
+                        countryCounts[locName] = (countryCounts[locName] || 0) + 1;
+                    }
+                }
+                updateUI();
+            });
+        } else {
+            setTimeout(() => {
+                alert("データベース未接続です。\n\n開発環境設定：\nコード内の「firebaseConfig」を書き換えてFirebaseと連携してください！");
+            }, 1000);
+            updateUI(); // 空の状態で表示
         }
 
         map.on('click', async function (e) {
+            if (!isFirebaseConfigured) {
+                alert("Firebase が未設定です。設定後にクリック可能になります。");
+                return;
+            }
             const { lat, lng } = e.latlng;
             const tempPopup = L.popup().setLatLng(e.latlng).setContent("Preparing flag...").openOn(map);
 
             try {
-                // Get country code from Nominatim API
                 const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=jsonv2&accept-language=en`;
                 const response = await fetch(url);
                 const data = await response.json();
@@ -280,16 +327,19 @@
                 const dd = String(today.getDate()).padStart(2, '0');
                 const dateStr = `${yyyy}/${mm}/${dd}`;
 
-                const locName = stateName ? `${countryName} (${stateName})` : countryName;
+                const newItem = {
+                    country: countryName,
+                    state: stateName,
+                    code: countryCode,
+                    lat: lat,
+                    lng: lng,
+                    date: dateStr,
+                    timestamp: Date.now()
+                };
 
-                // Update data
-                totalClicks++;
-                countryCounts[locName] = (countryCounts[locName] || 0) + 1;
-                clickHistory.push({ country: countryName, state: stateName, code: countryCode, lat, lng, date: dateStr });
-
+                // Firebaseへ追加 (ローカルストレージの代わり)
+                push(dbRefClicks, newItem);
                 map.closePopup();
-                saveData();
-                updateUI();
 
             } catch (error) {
                 console.error("Error:", error);
@@ -298,34 +348,26 @@
         });
 
         document.getElementById('undo-btn').addEventListener('click', () => {
-            if (clickHistory.length === 0) return;
-            const last = clickHistory.pop();
-            totalClicks--;
-            const locName = last.state ? `${last.country} (${last.state})` : last.country;
-            if (countryCounts[locName]) {
-                if (--countryCounts[locName] === 0) delete countryCounts[locName];
-            } else if (countryCounts[last.country]) {
-                if (--countryCounts[last.country] === 0) delete countryCounts[last.country];
+            if (!isFirebaseConfigured || clickHistory.length === 0) return;
+            const lastItem = clickHistory[clickHistory.length - 1];
+            if (lastItem && lastItem.firebaseKey) {
+                remove(ref(db, `clicks/${lastItem.firebaseKey}`));
             }
-            saveData();
-            updateUI();
         });
 
         document.getElementById('reset-btn').addEventListener('click', () => {
-            if (confirm("Delete all flags and data?")) {
-                totalClicks = 0; countryCounts = {}; clickHistory = [];
-                localStorage.clear();
-                updateUI();
+            if (!isFirebaseConfigured) return;
+            if (confirm("本当にデータベースの全データを削除しますか？")) {
+                remove(dbRefClicks);
             }
         });
 
-        // CSV export feature
+        // ------------------ CSV Functions ------------------
         document.getElementById('csv-btn').addEventListener('click', () => {
             if (clickHistory.length === 0) {
                 alert("No data to save.");
                 return;
             }
-            // Add BOM for UTF-8 to prevent garbled text in Excel etc.
             let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
             csvContent += "Country,State,Country Code,Latitude,Longitude,Date\n";
 
@@ -344,12 +386,15 @@
             document.body.removeChild(link);
         });
 
-        // CSV import feature
         document.getElementById('load-csv-btn').addEventListener('click', () => {
             document.getElementById('csv-upload').click();
         });
 
         document.getElementById('csv-upload').addEventListener('change', (e) => {
+            if (!isFirebaseConfigured) {
+                alert("Firebase が未設定です。データベースがないため読み込めません。");
+                return;
+            }
             const file = e.target.files[0];
             if (!file) return;
 
@@ -357,18 +402,16 @@
             reader.onload = (event) => {
                 const text = event.target.result;
                 const lines = text.split('\n');
-                
                 let mergedCount = 0;
-                
+
                 for (let i = 1; i < lines.length; i++) {
                     const line = lines[i].trim();
                     if (!line) continue;
-                    
+
                     const parts = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
                     let country, state, code, lat, lng, date;
 
                     if (parts.length >= 5 && Number.isNaN(parseFloat(parts[2]))) {
-                        // New format: Country,State,Country Code,Lat,Lng,Date
                         country = parts[0].replace(/^"|"$/g, '').trim();
                         state = parts[1].replace(/^"|"$/g, '').trim();
                         code = parts[2].trim();
@@ -376,7 +419,6 @@
                         lng = parseFloat(parts[4]);
                         date = parts[5] ? parts[5].replace(/^"|"$/g, '').trim() : "";
                     } else if (parts.length >= 4) {
-                        // Old format: Country,Country Code,Lat,Lng,Date
                         country = parts[0].replace(/^"|"$/g, '').trim();
                         state = "";
                         code = parts[1].trim();
@@ -386,42 +428,38 @@
                     } else {
                         continue;
                     }
-                    
+
                     if (country && code && !isNaN(lat) && !isNaN(lng)) {
-                        // Check for duplicates
-                        const isDuplicate = clickHistory.some(item => 
+                        const isDuplicate = clickHistory.some(item =>
                             item.lat === lat && item.lng === lng && item.code === code && (item.date || "") === date
                         );
-                        
+
                         if (!isDuplicate) {
-                            clickHistory.push({ country, state, code, lat, lng, date });
-                            totalClicks++;
-                            const locName = state ? `${country} (${state})` : country;
-                            countryCounts[locName] = (countryCounts[locName] || 0) + 1;
+                            const newItem = { country, state, code, lat, lng, date, timestamp: Date.now() };
+                            // Upload to Firebase
+                            push(dbRefClicks, newItem);
                             mergedCount++;
+                            clickHistory.push(newItem);
                         }
                     }
                 }
-                
+
                 if (mergedCount > 0) {
-                    saveData();
-                    updateUI();
-                    alert(`${mergedCount} records merged successfully.`);
+                    alert(`${mergedCount} records are being uploaded to the database.`);
                 } else {
                     alert("No new records to merge or invalid CSV file.");
                 }
-                
-                e.target.value = ''; // Reset input
+                e.target.value = '';
             };
             reader.readAsText(file);
         });
 
+        // ------------------ UI Updates ------------------
         function updateUI() {
             document.getElementById('total-count').innerText = totalClicks;
             updateList('country-list', countryCounts);
             document.getElementById('undo-btn').disabled = clickHistory.length === 0;
 
-            // Redraw markers
             markerGroup.clearLayers();
             clickHistory.forEach(item => {
                 const flagUrl = `https://flagcdn.com/w40/${item.code}.png`;
